@@ -1,24 +1,70 @@
-from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult
+import asyncio
+import random
+from typing import Dict
+from astrbot.api.event.filter import command
+from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, register
-from astrbot.api import logger
 
-@register("helloworld", "YourName", "一个简单的 Hello World 插件", "1.0.0")
-class MyPlugin(Star):
+@register("astrbot_plugin_meow", "慕容奈依", "喵喵喵", "1.0.0", "https://github.com/OOM-WG/astrbot_plugin_meow")
+class MeowPlugin(Star):
     def __init__(self, context: Context):
         super().__init__(context)
-
-    async def initialize(self):
-        """可选择实现异步的插件初始化方法，当实例化该插件类之后会自动调用该方法。"""
-    
-    # 注册指令的装饰器。指令名为 helloworld。注册成功后，发送 `/helloworld` 就会触发这个指令，并回复 `你好, {user_name}!`
-    @filter.command("helloworld")
-    async def helloworld(self, event: AstrMessageEvent):
-        """这是一个 hello world 指令""" # 这是 handler 的描述，将会被解析方便用户了解插件内容。建议填写。
-        user_name = event.get_sender_name()
-        message_str = event.message_str # 用户发的纯文本消息字符串
-        message_chain = event.get_messages() # 用户所发的消息的消息链 # from astrbot.api.message_components import *
-        logger.info(message_chain)
-        yield event.plain_result(f"Hello, {user_name}, 你发了 {message_str}!") # 发送一条纯文本消息
-
-    async def terminate(self):
-        """可选择实现异步的插件销毁方法，当插件被卸载/停用时会调用。"""
+        self.groups: set[int] = set()
+        self.tasks: Dict[int, asyncio.Task] = {}
+        self.meow = [
+            "喵",
+            "喵喵",
+            "喵喵喵",
+            "喵呜"
+        ]
+        self.sym = [
+            "···",
+            "······",
+            "❤️",
+            "♡",
+            "～",
+            "~",
+            "?"
+        ]
+    async def _meow_loop(self, group_id: int, event: AstrMessageEvent):
+        try:
+            while group_id in self.groups:
+                await event.bot.api.send_group_msg(**{
+                    "group_id": group_id,
+                    "message": [
+                        {
+                            "type": "text",
+                            "data": {
+                                "text": f"{random.choice(self.meow)}{random.choice(self.sym)}"
+                            }
+                        }
+                    ]
+                })
+                await asyncio.sleep(random.randint(45 * 60, 90 * 60))
+        except asyncio.CancelledError:
+            return
+    @filter.permission_type(filter.PermissionType.ADMIN)
+    @command("meow")
+    async def meow_cmd(self, event: AstrMessageEvent, operation: str = ""):
+        if event.get_platform_name() != "aiocqhttp":
+            yield event.plain_result("此命令仅在QQ中可用")
+            return
+        if not event.message_obj.group_id:
+            yield event.plain_result("此命令仅在群聊中可用")
+            return
+        id = event.get_group_id()
+        if operation == "off":
+            self.groups.discard(id)
+            task = self.tasks.pop(id, None)
+            if task:
+                task.cancel()
+            yield event.plain_result("已在本群关闭喵喵喵")
+        elif operation == "on":
+            if id in self.groups:
+                yield event.plain_result("本群已经开启喵喵喵")
+                return
+            self.groups.add(id)
+            self.tasks[id] = asyncio.create_task(self._meow_loop(id, event))
+            yield event.plain_result("已在本群开启喵喵喵")
+        else:
+            yield event.plain_result("用法: /meow [on|off]")
