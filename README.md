@@ -1,9 +1,3 @@
-# helloworld
+# AstrBot Meow
 
-AstrBot 插件模板
-
-A template plugin for AstrBot plugin feature
-
-# 支持
-
-[帮助文档](https://astrbot.app)
+AstrBot 插件，让机器人可以喵喵叫。
